@@ -19,6 +19,7 @@ jobs:
           matrix=$(yaml2json build.yaml | jq -c .)
           yaml2json build.yaml
           echo "::set-output name=matrix::${matrix}"
+          
   build:
     runs-on: ubuntu-latest
     container:
@@ -44,8 +45,10 @@ jobs:
           echo ::set-output name=extra-cmake-args::${EXTRA_CMAKE_ARGS}
           echo ::set-output name=artifact-name::${ARTIFACT_NAME}
           echo ::set-output name=display-name::${DISPLAY_NAME}
+          
       - name: Checkout
         uses: actions/checkout@v2
+        
       - name: Cache west modules
         uses: actions/cache@v4
         env:
@@ -62,20 +65,26 @@ jobs:
             ${{ runner.os }}-build-${{ env.cache-name }}-
             ${{ runner.os }}-build-
             ${{ runner.os }}-
+            
       - name: West Init
         run: west init -l config
+        
       - name: West Update
         run: west update
+        
       - name: West Zephyr export
         run: west zephyr-export
+        
       - name: West Build (${{ steps.variables.outputs.display-name }})
         run: |
           west build -s zmk/app -b ${{ matrix.board }} -- -DZMK_CONFIG=${GITHUB_WORKSPACE}/config ${{ steps.variables.outputs.extra-cmake-args }} ${{ matrix.cmake-args }}
+          
       - name: ${{ steps.variables.outputs.display-name }} Kconfig file
         run: cat build/zephyr/.config | grep -v "^#" | grep -v "^$"
+        
       - name: Rename artifacts
         run: |
-          mkdir build/artifacts
+          mkdir -p build/artifacts
           if [ -f build/zephyr/zmk.uf2 ]
           then
             cp build/zephyr/zmk.uf2 "build/artifacts/${{ steps.variables.outputs.artifact-name }}.uf2"
@@ -83,8 +92,10 @@ jobs:
           then
             cp build/zephyr/zmk.hex "build/artifacts/${{ steps.variables.outputs.artifact-name }}.hex"
           fi
-      - name: Archive (${{ steps.variables.outputs.display-name }})
+          
+      # КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: используем уникальное имя артефакта
+      - name: Archive firmware
         uses: actions/upload-artifact@v4
         with:
-          name: firmware
+          name: firmware-${{ matrix.board }}-${{ matrix.shield }}-${{ github.run_id }}
           path: build/artifacts
